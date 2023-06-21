@@ -7,6 +7,7 @@ import {CardElement,useStripe,useElements} from '@stripe/react-stripe-js'
 import CurrencyFormat from 'react-currency-format'
 import {getBasketTotal} from './reducer'
 import axios from './axios'
+import {db} from './firebase'
 
 function Payment() {
     const navigate=useNavigate();
@@ -14,20 +15,20 @@ function Payment() {
     const stripe=useStripe();
     const elements=useElements();
     const [error,setError]=useState(null);
-    const [disabled,setDisbled]=useState(true);
+    const [disabled,setDisabled]=useState(true);
     const [succeeded,setSucceeded]=useState(false);
     const [processing,setProcessing]=useState("");
     const [clientSecret,setClientSecret]=useState(true);
-    useEffect(()=>{
-        const getClientSecret=async()=>{
-            const response=await axios({
-                method:"post",
-                url:`/payments/create?total=${getBasketTotal(basket)*100}`
-            });
-            setClientSecret(response.data.clientSecret);
-        }
+    useEffect(() => {
+        const getClientSecret = async () => {
+          const response = await axios({
+            method: "post",
+            url: `/payments/create?total=${getBasketTotal(basket) * 100}`,
+          });
+          setClientSecret(response.data.clientSecret);
+        };
         getClientSecret();
-    },[basket])
+      }, [basket]);
     console.log("The secret is ",clientSecret);
     const handleSubmit=async(e)=>{
         e.preventDefault();
@@ -37,14 +38,22 @@ function Payment() {
                 card:elements.getElement(CardElement)
             }
         }).then(({paymentIntent})=>{
+            db.collection('users').doc(user?.uid).collection('orders').doc(paymentIntent.id).set({
+                basket:basket,
+                amount:paymentIntent.amount,
+                created:paymentIntent.created
+            })
             setSucceeded(true);
             setError(null);
             setProcessing(false);
+            dispatch({
+                type: 'EMPTY_BASKET'
+            })
             navigate("/orders");
         })
     }
     const handleChange=e=>{
-        setDisbled(e.empty);
+        setDisabled(e.empty);
         setError(e.error?e.error.message:"");
     }
   return (
